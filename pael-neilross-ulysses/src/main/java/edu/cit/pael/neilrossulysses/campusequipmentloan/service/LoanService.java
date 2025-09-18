@@ -27,7 +27,7 @@ public class LoanService {
         this.studentRepo = studentRepo;
     }
 
-    public Loan createLoan(Long equipmentId, Long studentId) {
+    public Loan createLoan(Long equipmentId, Long studentId, LocalDate startDate, LocalDate dueDate) {
         // Rule 1: Max 2 active loans
         if (loanRepo.countByStudentIdAndStatus(studentId, "ACTIVE") >= 2) {
             throw new MaxActiveLoansException("Max 2 active loans allowed per student");
@@ -46,8 +46,8 @@ public class LoanService {
         Loan loan = new Loan();
         loan.setEquipment(equipment);
         loan.setStudent(student);
-        loan.setStartDate(LocalDate.now());
-        loan.setDueDate(LocalDate.now().plusDays(7)); // Rule 2: loan length = 7 days
+        loan.setStartDate(startDate != null ? startDate : LocalDate.now());
+        loan.setDueDate(dueDate != null ? dueDate : loan.getStartDate().plusDays(7)); // if null, default to startDate + 7
         loan.setStatus("ACTIVE");
 
         equipment.setAvailable(false);
@@ -55,6 +55,7 @@ public class LoanService {
 
         return loanRepo.save(loan);
     }
+
 
     public Loan returnLoan(Long loanId, LocalDate returnDate) {
         Loan loan = loanRepo.findById(loanId)

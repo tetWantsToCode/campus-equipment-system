@@ -28,7 +28,18 @@ public class LoanController {
     public Loan createLoan(@RequestBody JsonNode json) {
         Long equipmentId = json.get("equipmentId").asLong();
         Long studentId = json.get("studentId").asLong();
-        return loanService.createLoan(equipmentId, studentId);
+
+        LocalDate startDate = null;
+        if (json.hasNonNull("startDate")) {
+            startDate = LocalDate.parse(json.get("startDate").asText());
+        }
+
+        LocalDate dueDate = null;
+        if (json.hasNonNull("dueDate")) {
+            dueDate = LocalDate.parse(json.get("dueDate").asText());
+        }
+
+        return loanService.createLoan(equipmentId, studentId, startDate, dueDate);
     }
 
     @PostMapping("/{id}/return")
