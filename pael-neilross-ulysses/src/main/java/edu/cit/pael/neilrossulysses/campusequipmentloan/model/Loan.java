@@ -1,7 +1,6 @@
 package edu.cit.pael.neilrossulysses.campusequipmentloan.model;
 
 import jakarta.persistence.*;
-
 import java.time.LocalDate;
 
 @Entity
@@ -10,7 +9,7 @@ public class Loan {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)  // <-- changed here
     private Equipment equipment;
 
     @ManyToOne
@@ -20,6 +19,9 @@ public class Loan {
     private LocalDate dueDate;
     private LocalDate returnDate;
     private String status; // ACTIVE, RETURNED, OVERDUE
+
+    @Column(nullable = false)
+    private double penalty = 0.0;
 
     // getters and setters
     public Long getId() {
@@ -76,5 +78,13 @@ public class Loan {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public double getPenalty() {
+        return penalty;
+    }
+
+    public void setPenalty(double penalty) {
+        this.penalty = penalty;
     }
 }

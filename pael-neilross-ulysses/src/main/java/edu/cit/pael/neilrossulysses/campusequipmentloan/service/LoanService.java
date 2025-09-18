@@ -1,11 +1,14 @@
 package edu.cit.pael.neilrossulysses.campusequipmentloan.service;
 
+import edu.cit.pael.neilrossulysses.campusequipmentloan.exception.LoanNotFoundException;
+import edu.cit.pael.neilrossulysses.campusequipmentloan.exception.MaxActiveLoansException;
 import edu.cit.pael.neilrossulysses.campusequipmentloan.model.Equipment;
 import edu.cit.pael.neilrossulysses.campusequipmentloan.model.Loan;
 import edu.cit.pael.neilrossulysses.campusequipmentloan.model.Student;
 import edu.cit.pael.neilrossulysses.campusequipmentloan.repository.EquipmentRepository;
 import edu.cit.pael.neilrossulysses.campusequipmentloan.repository.LoanRepository;
 import edu.cit.pael.neilrossulysses.campusequipmentloan.repository.StudentRepository;
+import edu.cit.pael.neilrossulysses.campusequipmentloan.exception.EquipmentNotAvailableException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -27,14 +30,14 @@ public class LoanService {
     public Loan createLoan(Long equipmentId, Long studentId) {
         // Rule 1: Max 2 active loans
         if (loanRepo.countByStudentIdAndStatus(studentId, "ACTIVE") >= 2) {
-            throw new RuntimeException("Max 2 active loans allowed per student");
+            throw new MaxActiveLoansException("Max 2 active loans allowed per student");
         }
 
         Equipment equipment = equipRepo.findById(equipmentId)
                 .orElseThrow(() -> new RuntimeException("Equipment not found"));
 
         if (!equipment.isAvailable()) {
-            throw new RuntimeException("Equipment is not available");
+            throw new EquipmentNotAvailableException("Equipment is not available");
         }
 
         Student student = studentRepo.findById(studentId)
@@ -53,18 +56,21 @@ public class LoanService {
         return loanRepo.save(loan);
     }
 
-    public Loan returnLoan(Long loanId) {
+    public Loan returnLoan(Long loanId, LocalDate returnDate) {
         Loan loan = loanRepo.findById(loanId)
-                .orElseThrow(() -> new RuntimeException("Loan not found"));
+                .orElseThrow(() -> new LoanNotFoundException("Loan not found with id: " + loanId));
 
-        loan.setReturnDate(LocalDate.now());
-        if (loan.getReturnDate().isAfter(loan.getDueDate())) {
+        loan.setReturnDate(returnDate);
+
+        if (returnDate.isAfter(loan.getDueDate())) {
             loan.setStatus("OVERDUE");
-            long daysLate = ChronoUnit.DAYS.between(loan.getDueDate(), loan.getReturnDate());
-            long penalty = daysLate * 50; // Rule 4: ₱50/day late
+            long daysLate = ChronoUnit.DAYS.between(loan.getDueDate(), returnDate);
+            double penalty = daysLate * 50.0;  // ₱50.0 per day late as double
+            loan.setPenalty(penalty);
             System.out.println("Penalty: ₱" + penalty);
         } else {
             loan.setStatus("RETURNED");
+            loan.setPenalty(0.0);  // no penalty
         }
 
         Equipment equipment = loan.getEquipment();
@@ -75,6 +81,31 @@ public class LoanService {
     }
 
     public List<Loan> getAllLoans() {
-        return loanRepo.findAll();
+        List<Loan> loans = loanRepo.findAll();
+        // Update statuses on the fly for all loans that are overdue but not returned
+        loans.forEach(this::updateLoanStatusIfOverdue);
+        return loans;
+    }
+
+    public Loan saveOrUpdateLoan(Loan loan) {
+        updateLoanStatusIfOverdue(loan);
+
+        // Also manage equipment availability if needed (optional, depends on your logic)
+        if ("ACTIVE".equals(loan.getStatus())) {
+            loan.getEquipment().setAvailable(false);
+        } else {
+            loan.getEquipment().setAvailable(true);
+        }
+        equipRepo.save(loan.getEquipment());
+
+        return loanRepo.save(loan);
+    }
+
+    private void updateLoanStatusIfOverdue(Loan loan) {
+        if (loan.getReturnDate() == null &&
+                (loan.getStatus() == null || "ACTIVE".equals(loan.getStatus())) &&
+                LocalDate.now().isAfter(loan.getDueDate())) {
+            loan.setStatus("OVERDUE");
+        }
     }
 }
