@@ -34,13 +34,9 @@ public class LoanController {
             startDate = LocalDate.parse(json.get("startDate").asText());
         }
 
-        LocalDate dueDate = null;
-        if (json.hasNonNull("dueDate")) {
-            dueDate = LocalDate.parse(json.get("dueDate").asText());
-        }
-
-        return loanService.createLoan(equipmentId, studentId, startDate, dueDate);
+        return loanService.createLoan(equipmentId, studentId, startDate);
     }
+
 
     @PostMapping("/{id}/return")
     public Loan returnLoan(@PathVariable Long id, @RequestBody JsonNode json) {
